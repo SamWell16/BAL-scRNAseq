@@ -1,0 +1,68 @@
+#BAL pipeline starts
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(SingleR)
+library(liger)
+
+options(future.globals.maxSize = 4000 * 1024^2)
+
+hpca.se <- HumanPrimaryCellAtlasData()
+
+
+ALAD.BAL.data <- Read10X(sample.dirs = "https://dataverse.scholarsportal.info/api/access/datafile/145169")
+
+ALAD.BAL <- CreateSeuratObject(counts = ALAD.BAL.data, min.cells = 3, min.features = 200)
+
+ALAD.BAL[["patient.condition"]] <- Idents(object = ALAD.BAL)
+ALAD.BAL[["patient.id"]] <- Idents(object = ALAD.BAL)
+
+ALAD.BAL$patient.condition = "ALAD"
+
+
+ALAD.BAL <- PercentageFeatureSet(ALAD.BAL, pattern = "^MT-", col.name = "percent.mt")
+
+ALAD.BAL <- subset(ALAD.BAL, subset = nFeature_RNA < 5000 & nCount_RNA < 30000 & percent.mt < 10)
+
+#VlnPlot first clean-up
+VlnPlot(ALAD.BAL, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+ALAD.BAL <- NormalizeData(ALAD.BAL, normalization.method = "LogNormalize", scale.factor = 10000)
+ALAD.BAL <- subset (ALAD.BAL, downsample = 1500)
+S03.normdata <- GetAssayData(ALAD.BAL)
+
+S03.annSmain <- SingleR(test = S03.normdata, ref = hpca.se, labels = hpca.se$label.main, fine.tune = TRUE, genes = "de", tune.thresh = 0.05)
+
+S03.annSfine <- SingleR(test = S03.normdata, ref = hpca.se, labels = hpca.se$label.fine, fine.tune = TRUE, genes = "de", tune.thresh = 0.05)
+
+
+plotScoreHeatmap(S03.annSmain)
+plotScoreHeatmap(S03.annSfine)
+
+ALAD.BAL[["SingleR.Mainlabels"]] <- S03.annSmain$labels
+ALAD.BAL[["SingleR.Finelabels"]] <- S03.annSfine$labels
+
+saveRDS(ALAD.BAL, file = "/Volumes/SM_Juvet/BAL_scRNAseq_filtered_genes_raw/outputs/S03_All/S03.rds")
+
+ALAD.BAL.Mac <- subset(ALAD.BAL, subset = SingleR.Mainlabels == "Macrophage")
+
+ALAD.BAL.Mac <- SCTransform(S03.Mac, vars.to.regress = c("nFeature_RNA", "nCount_RNA", "percent.mt"), verbose = FALSE)
+ALAD.BAL.Mac <- RunPCA(S03.Mac, verbose = FALSE)
+DimPlot(ALAD.BAL.Mac)
+VizDimLoadings(ALAD.BAL.Mac, dims = 1:6, reduction = "pca")
+ALAD.BAL.Mac <- RunTSNE(ALAD.BAL.Mac, dims = 1:30, verbose = FALSE)
+ALAD.BAL.Mac <- FindNeighbors(ALAD.BAL.Mac, dims = 1:30, verbose = FALSE)
+S03.Mac <- FindClusters(ALAD.BAL.Mac, resolution = 0.8, verbose = FALSE)
+DimPlot(ALAD.BAL.Mac, label = TRUE)
+
+ALAD.BAL.Mac.markers <- FindAllMarkers(S03.Mac, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25, test.use = "MAST", min.diff.pct = 0.15)
+
+ALAD.BAL.Mac.top5 <- ALAD.BAL.Mac.markers %>% group_by(cluster) %>% top_n(n = 5, wt= avg_logFC)
+
+
+DoHeatmap(ALAD.BAL.Mac, features = ALAD.BAL.Mac.top5$gene) + NoLegend()
+
+
+
+
+
