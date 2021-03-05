@@ -1,2 +1,2 @@
 # BAL-scRNAseq
-Seurat objects of scRNAseq of BAL sample from patients post lung transplantation 
+Single cell transcriptomes of bronchoalveolar lavage samples from 6 lung transplant recipients.
