@@ -9,6 +9,17 @@ options(future.globals.maxSize = 4000 * 1024^2)
 
 hpca.se <- HumanPrimaryCellAtlasData()
 
+#cleaning RNA count matrix
+ATP5.index <- grep(pattern = "^ATP5", x = rownames (DBALall), value = FALSE)
+DBALall <- DBALall[-ATP5.index, ]
+
+RPL.index <- grep(pattern = "^RPL", x = rownames (DBALall), value = FALSE)
+DBALall <- DBALall[-RPL.index, ]
+
+RPS.index <- grep(pattern = "^RPS", x = rownames (DBALall), value = FALSE)
+DBALall <- DBALall[-RPS.index, ]
+
+
 
 ALAD.BAL.data <- Read10X(sample.dirs = "https://dataverse.scholarsportal.info/api/access/datafile/145169")
 
